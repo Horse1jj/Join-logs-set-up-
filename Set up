@@ -16,8 +16,7 @@ pip install discord.py pavlov-rcon asyncio
 Step 2: Write the Bot Script
 Here is a basic script that demonstrates how you can achieve this:
 
-python
-Copy code
+
 import discord
 import asyncio
 from pavlov_rcon import PavlovRCON
@@ -30,17 +29,20 @@ RCON_PASSWORD = 'your-rcon-password'
 CHANNEL_ID = your-discord-channel-id  # Channel where the bot will send the message
 
 # Initialize the Discord client
+
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
 
 # Function to send embed message to the Discord channel
+
 async def send_embed_message(player_name):
     channel = client.get_channel(CHANNEL_ID)
     embed = discord.Embed(title="Player Joined", description=f"{player_name} has joined the server.", color=0x00ff00)
     await channel.send(embed=embed)
 
 # Function to listen for player join events
+
 async def listen_for_player_joins():
     async with PavlovRCON(RCON_HOST, RCON_PORT, RCON_PASSWORD) as rcon:
         while True:
@@ -65,6 +67,7 @@ def extract_player_name(log_line):
     return player_name
 
 # Run the bot
+
 client.run(DISCORD_TOKEN)
 Step 3: How the Script Works
 Discord Client: The script initializes a Discord bot using discord.py.
@@ -79,6 +82,7 @@ Log Parsing: Ensure the extract_player_name function correctly parses the log li
 Embed Design: Customize the embedded message appearance as needed.
 Deployment: You can run this bot script on your local machine or host it on a server.
 
-Notes
+# Notes
+
 Server Logs: The format of the log lines can vary, so you might need to experiment to get the correct pattern for identifying player joins.
 Error Handling: Implement appropriate error handling, such as reconnecting to RCON if the connection drops.
