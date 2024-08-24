@@ -1,88 +1,64 @@
-Prerequisites
-Python Installed: Ensure you have Python installed.
-
-Discord Bot Token: Create a Discord bot via the Discord Developer Portal.
-Pavlov RCON Access: Ensure you have access to the Pavlov Shack server’s RCON (Remote Console) with credentials.
-
-Python Packages: Install the following Python packages:
-discord.py: For the Discord bot API.
-pavlov-rcon: To communicate with the Pavlov RCON.
-
-asyncio: For asynchronous operations.
-Step 1: Install Required Python Packages
-bash
-Copy code
-pip install discord.py pavlov-rcon asyncio
-Step 2: Write the Bot Script
-Here is a basic script that demonstrates how you can achieve this:
-
-
 import discord
-import asyncio
-from pavlov_rcon import PavlovRCON
+from discord.ext import commands, tasks
+from mcrcon import MCRcon
+import time
 
-# Discord bot token and RCON details
-DISCORD_TOKEN = 'your-discord-bot-token'
-RCON_HOST = 'your-pavlov-server-ip'
-RCON_PORT = your-pavlov-rcon-port  # Default is 9100
-RCON_PASSWORD = 'your-rcon-password'
-CHANNEL_ID = your-discord-channel-id  # Channel where the bot will send the message
+# Discord bot token and channel ID
+DISCORD_TOKEN = 'your_discord_bot_token'
+CHANNEL_ID = 123456789012345678  # Replace with your target channel ID
 
-# Initialize the Discord client
+# RCON connection details
+RCON_HOST = 'your_pavlov_server_ip'
+RCON_PORT = 12345  # Default RCON port for Pavlov
+RCON_PASSWORD = 'your_rcon_password'
 
+# Set up the Discord bot
 intents = discord.Intents.default()
-intents.message_content = True
-client = discord.Client(intents=intents)
+intents.messages = True
+bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Function to send embed message to the Discord channel
+# Store connected users to avoid duplicate logs
+connected_users = set()
 
-async def send_embed_message(player_name):
-    channel = client.get_channel(CHANNEL_ID)
-    embed = discord.Embed(title="Player Joined", description=f"{player_name} has joined the server.", color=0x00ff00)
-    await channel.send(embed=embed)
-
-# Function to listen for player join events
-
-async def listen_for_player_joins():
-    async with PavlovRCON(RCON_HOST, RCON_PORT, RCON_PASSWORD) as rcon:
-        while True:
-            log_lines = await rcon.get_log_lines()
-            for line in log_lines:
-                if "PlayerConnected" in line:  # This depends on the actual log format
-                    player_name = extract_player_name(line)  # Implement this to extract player name
-                    await send_embed_message(player_name)
-            await asyncio.sleep(5)  # Delay between checks to avoid spamming the server
-
-@client.event
+@bot.event
 async def on_ready():
-    print(f'{client.user} has connected to Discord!')
-    # Start listening for player joins
-    client.loop.create_task(listen_for_player_joins())
+    print(f'Bot is ready. Logged in as {bot.user}')
+    check_for_new_players.start()
 
-# Extract player name from log line (this needs to be implemented based on log format)
-def extract_player_name(log_line):
-    # Example extraction logic (this needs to match your server's log format)
-    parts = log_line.split(' ')
-    player_name = parts[-1]  # Adjust this based on actual log format
-    return player_name
+# Task to check for new players on the server
+@tasks.loop(seconds=10)  # Adjust the interval as needed
+async def check_for_new_players():
+    try:
+        with MCRcon(RCON_HOST, RCON_PASSWORD, port=RCON_PORT) as mcr:
+            response = mcr.command('ListPlayers')  # Command to get the list of players
+
+            # Parse the response to extract player names
+            current_players = set(parse_players(response))
+
+            # Find newly joined players
+            new_players = current_players - connected_users
+
+            if new_players:
+                # Send a message to the Discord channel for each new player
+                channel = bot.get_channel(CHANNEL_ID)
+                for player in new_players:
+                    await channel.send(f'{player} has joined the server!')
+
+            # Update the set of connected players
+            connected_users.update(new_players)
+
+    except Exception as e:
+        print(f'Error fetching player data: {e}')
+
+# Function to parse the player list from the RCON response
+def parse_players(response):
+    # Example logic, adjust based on actual response format
+    # Assuming response contains player names in a list format
+    lines = response.split('\n')
+    players = [line.strip() for line in lines if line.strip()]
+    return players
 
 # Run the bot
+bot.run(DISCORD_TOKEN)
 
-client.run(DISCORD_TOKEN)
-Step 3: How the Script Works
-Discord Client: The script initializes a Discord bot using discord.py.
-RCON Connection: The bot connects to your Pavlov Shack server via RCON using the pavlov-rcon package.
 
-Listening for Player Joins: The script listens for specific log lines that indicate a player has joined (e.g., "PlayerConnected" in the logs). You'll need to adjust this based on the actual log format that Pavlov Shack RCON returns.
-Sending an Embed: When a player joins, the bot sends an embedded message to a specific Discord channel with the player's name.
-
-Step 4: Customize and Deploy
-Log Parsing: Ensure the extract_player_name function correctly parses the log line to extract the player’s name.
-
-Embed Design: Customize the embedded message appearance as needed.
-Deployment: You can run this bot script on your local machine or host it on a server.
-
-# Notes
-
-Server Logs: The format of the log lines can vary, so you might need to experiment to get the correct pattern for identifying player joins.
-Error Handling: Implement appropriate error handling, such as reconnecting to RCON if the connection drops.
